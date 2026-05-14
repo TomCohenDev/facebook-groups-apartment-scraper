@@ -18,6 +18,9 @@ locations:
     - "גני חיים"
     - "גיבעת חן"
 
+# ── Date ──────────────────────────────────────────────────────────────────────
+min_date: "2026-01-01"   # skip posts older than this date (YYYY-MM-DD). null to disable.
+
 # ── Price ─────────────────────────────────────────────────────────────────────
 price:
   max: 4500          # posts above this are still forwarded but flagged

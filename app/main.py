@@ -33,6 +33,21 @@ def _passes_hard_filters(ai_result: dict | None, criteria: dict) -> bool:
     return True
 
 
+def _passes_date_filter(timestamp_text: str | None, criteria: dict) -> bool:
+    min_date_str = criteria.get("min_date")
+    if not min_date_str or not timestamp_text:
+        return True
+    try:
+        post_dt = datetime.fromtimestamp(int(timestamp_text), tz=timezone.utc)
+        min_dt = datetime.fromisoformat(min_date_str).replace(tzinfo=timezone.utc)
+        if post_dt < min_dt:
+            logger.info("Skipping: post date %s < min_date %s", post_dt.date(), min_date_str)
+            return False
+    except (ValueError, OSError):
+        pass
+    return True
+
+
 async def run_group(group_cfg: dict, criteria: dict) -> None:
     start_time = datetime.now(tz=timezone.utc)
     ai_cfg = criteria.get("ai", {})
@@ -70,6 +85,7 @@ async def run_group(group_cfg: dict, criteria: dict) -> None:
 
                 qualifies = (
                     settings.telegram_bot_token
+                    and _passes_date_filter(db_post.timestamp_text, criteria)
                     and _passes_hard_filters(ai_result, criteria)
                     and (send_non_listings or ai_result is None or ai_result.get("is_listing"))
                 )
