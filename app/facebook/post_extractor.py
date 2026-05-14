@@ -193,7 +193,14 @@ async def extract_posts_from_page(
         page.on("response", make_graphql_collector(raw_stories))
         await asyncio.sleep(3)
 
+    def _story_hash(story: dict) -> str | None:
+        text = _find_message_text(story)
+        if not text:
+            return None
+        return content_hash(group_id, normalize_text(text))
+
     stale = 0
+    processed_idx = 0
     for i in range(max_scrolls):
         before = len(raw_stories)
         await scroll_down(page, times=1, delay_ms=2000)
@@ -209,14 +216,28 @@ async def extract_posts_from_page(
                 break
         else:
             stale = 0
+            # Stop early if any new story was already alerted — older posts follow
+            for story in raw_stories[processed_idx:after]:
+                if _story_hash(story) in seen_hashes:
+                    logger.debug("Hit already-alerted post during scroll, stopping early")
+                    processed_idx = after
+                    stale = 99  # force exit
+                    break
+            processed_idx = after
 
-        # Stop early if we have way more than we need (dedup happens below)
+        if stale >= 3:
+            break
+
         if after >= max_posts * 3:
             break
 
     posts: list[RawPost] = []
     seen_in_run: set[str] = set()
     for story in raw_stories:
+        chash = _story_hash(story)
+        if chash and chash in seen_hashes:
+            logger.debug("Hit already-alerted post in final pass, stopping")
+            break
         post = _story_to_raw_post(story, group_id, seen_in_run, seen_hashes, scrape_images)
         if post:
             seen_in_run.add(post.content_hash)
