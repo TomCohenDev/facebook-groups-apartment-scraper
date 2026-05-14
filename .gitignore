@@ -1,0 +1,29 @@
+# Browser profile & local runtime data (Playwright/Chromium)
+runtime/
+
+# Claude Code / local tooling
+.claude/
+
+# Environment & secrets — copy from .env.example
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Editors / OS
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local SQLite (if added later)
+*.sqlite3
