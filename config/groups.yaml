@@ -1,0 +1,20 @@
+groups:
+  - id: tel_aviv_no_broker
+    name: "דירות בתל אביב ללא תיווך"
+    url: "https://www.facebook.com/groups/PUT_GROUP_ID_HERE"
+    enabled: true
+    priority: high
+    max_posts_per_run: 25
+    scrape_comments: true
+    max_comments_per_post: 20
+    scrape_images: true
+
+  - id: givatayim_rentals
+    name: "דירות להשכרה בגבעתיים"
+    url: "https://www.facebook.com/groups/PUT_GROUP_ID_HERE"
+    enabled: true
+    priority: medium
+    max_posts_per_run: 15
+    scrape_comments: true
+    max_comments_per_post: 10
+    scrape_images: true
