@@ -104,6 +104,8 @@ async def main(limit: int | None = None) -> None:
                     if qualifies:
                         image_urls = [img.image_url for img in (raw.images or [])]
                         img_data = await download_images(context, image_urls) if image_urls else []
+                        # Reload columns after commit so Telegram phase can read attrs without a Session
+                        session.refresh(db_post)
                         to_send.append((db_post, group_cfg["name"], ai_result, img_data))
                     else:
                         total_filtered += 1
