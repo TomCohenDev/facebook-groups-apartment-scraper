@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 
-from playwright.async_api import Locator
+from playwright.async_api import BrowserContext, Locator
 
 from app.facebook.models import RawImage
+from app.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 _REJECT_SRC_PATTERNS = re.compile(
     r"emoji|reaction|static|rsrc|ads|logo|avatar|s\d+x\d+",
@@ -45,3 +48,24 @@ async def extract_images_from_container(container: Locator) -> list[RawImage]:
             continue
 
     return images
+
+
+async def download_images(
+    context: BrowserContext,
+    image_urls: list[str],
+    max_images: int = 4,
+) -> list[bytes]:
+    """Download up to max_images using the authenticated browser context."""
+    results: list[bytes] = []
+    for url in image_urls[:max_images]:
+        try:
+            response = await context.request.get(url)
+            if response.ok:
+                data = await response.body()
+                if len(data) > 1024:  # skip suspiciously small blobs
+                    results.append(data)
+            else:
+                logger.debug("Image fetch %s → HTTP %d", url, response.status)
+        except Exception as exc:
+            logger.debug("Image download failed (%s): %s", url, exc)
+    return results

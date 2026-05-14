@@ -2,51 +2,60 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.browser.context import create_context
 from app.browser.login_check import assert_logged_in
-from app.classifier.apartment_rules import extract_apartment
-from app.classifier.scoring import ALERT_THRESHOLD, score_extraction
+from app.classifier.ai_extractor import extract_post
 from app.facebook.group_reader import read_group
-from app.notifier.telegram import send_candidate_alert
+from app.facebook.image_extractor import download_images
+from app.notifier.telegram import send_post_alert, send_text
 from app.settings import load_criteria_config, load_groups_config, settings
 from app.storage.db import SessionLocal, engine
-from app.storage.repository import (
-    get_seen_hashes,
-    get_unsent_candidates,
-    mark_alert_sent,
-    save_candidate,
-    save_post,
-    upsert_group,
-)
-from app.storage.schema import FacebookPost, create_tables
+from app.storage.repository import get_seen_hashes, mark_post_alerted, save_post, upsert_group
+from app.storage.schema import create_tables
 from app.utils.logging import get_logger, setup_logging
 
 setup_logging(settings.log_level)
 logger = get_logger(__name__)
 
-_PRIORITY_INTERVALS = {
-    "high": 15,
-    "medium": 60,
-    "low": 120,
-}
+
+def _passes_hard_filters(ai_result: dict | None, criteria: dict) -> bool:
+    if not ai_result:
+        return True
+    price = ai_result.get("price_ils")
+    max_price = criteria.get("price", {}).get("max")
+    if price and max_price and price > max_price:
+        logger.info("Skipping: price %d > max %d", price, max_price)
+        return False
+    return True
 
 
 async def run_group(group_cfg: dict, criteria: dict) -> None:
+    start_time = datetime.now(tz=timezone.utc)
+    ai_cfg = criteria.get("ai", {})
+    send_non_listings = ai_cfg.get("send_non_listings", False)
+    ai_model = ai_cfg.get("model") or settings.ai_model
+
+    to_send: list[tuple] = []
+    total_scraped = 0
+    total_filtered = 0
+    report = None
+
     playwright, context = await create_context(settings.fb_profile_dir, settings.headless)
     try:
         await assert_logged_in(context)
 
         with SessionLocal() as session:
-            upsert_group(session, group_cfg)
+            db_group = upsert_group(session, group_cfg)
             session.commit()
-            seen = get_seen_hashes(session, group_cfg["id"])
+            actual_id = db_group.id
+            seen = get_seen_hashes(session, actual_id)
 
-        report = await read_group(context, group_cfg, seen)
+        effective_cfg = {**group_cfg, "id": actual_id}
+        report = await read_group(context, effective_cfg, seen)
 
         raw_posts = getattr(report, "raw_posts", [])
         with SessionLocal() as session:
@@ -55,46 +64,55 @@ async def run_group(group_cfg: dict, criteria: dict) -> None:
                 if db_post is None:
                     continue
                 session.commit()
+                total_scraped += 1
 
-                extraction = extract_apartment(raw.normalized_text)
-                score, reasons = score_extraction(extraction, criteria)
+                ai_result = await extract_post(raw.normalized_text, criteria, model=ai_model)
 
-                if extraction.is_listing:
-                    save_candidate(session, db_post.id, extraction, score, reasons)
-                    session.commit()
+                qualifies = (
+                    settings.telegram_bot_token
+                    and _passes_hard_filters(ai_result, criteria)
+                    and (send_non_listings or ai_result is None or ai_result.get("is_listing"))
+                )
+                if qualifies:
+                    image_urls = [img.image_url for img in (raw.images or [])]
+                    img_data = await download_images(context, image_urls) if image_urls else []
+                    to_send.append((db_post, group_cfg["name"], ai_result, img_data))
+                else:
+                    total_filtered += 1
 
-            if settings.telegram_bot_token:
-                unsent = get_unsent_candidates(session, ALERT_THRESHOLD)
-                for cand in unsent:
-                    post = session.get(FacebookPost, cand.post_id)
-                    if post:
-                        sent = await send_candidate_alert(cand, post, group_cfg["name"])
-                        if sent:
-                            mark_alert_sent(session, cand.id)
-                            session.commit()
-
-        logger.info(
-            "Group %s — seen=%d new=%d comments=%d errors=%d",
-            report.group_id,
-            report.posts_seen,
-            report.posts_new,
-            report.comments_scraped,
-            len(report.errors),
-        )
     finally:
         await context.close()
         await playwright.stop()
 
+    # Send header
+    if settings.telegram_bot_token and settings.telegram_chat_id and to_send:
+        date_str = start_time.strftime("%d/%m/%Y %H:%M")
+        await send_text(f"🔍 {date_str} — {len(to_send)} דירות חדשות")
 
-async def run_all(criteria: dict) -> None:
-    groups = load_groups_config()
-    for g in groups:
-        if not g.get("enabled", True):
-            continue
-        try:
-            await run_group(g, criteria)
-        except Exception as e:
-            logger.error("Group %s failed: %s", g["id"], e)
+    # Send alerts
+    total_sent = 0
+    for db_post, group_name, ai_result, img_data in to_send:
+        sent = await send_post_alert(db_post, group_name, ai_result, images=img_data or None)
+        if sent:
+            with SessionLocal() as session:
+                mark_post_alerted(session, db_post.id)
+                session.commit()
+            total_sent += 1
+
+    # Send summary
+    if settings.telegram_bot_token and settings.telegram_chat_id and (total_scraped or total_sent):
+        elapsed = (datetime.now(tz=timezone.utc) - start_time).total_seconds()
+        mins, secs = int(elapsed // 60), int(elapsed % 60)
+        await send_text(
+            f"✅ סיום — {total_scraped} נסרקו | {total_sent} נשלחו | {total_filtered} סוננו | {mins}m {secs}s"
+        )
+
+    errors = len(report.errors) if report else 0
+    group_id = report.group_id if report else group_cfg["id"]
+    logger.info(
+        "Group %s — scraped=%d sent=%d filtered=%d errors=%d",
+        group_id, total_scraped, total_sent, total_filtered, errors,
+    )
 
 
 async def main() -> None:
@@ -102,15 +120,13 @@ async def main() -> None:
     criteria = load_criteria_config()
 
     scheduler = AsyncIOScheduler()
-    groups = load_groups_config()
-    for g in groups:
+    for g in load_groups_config():
         if not g.get("enabled", True):
             continue
-        interval = _PRIORITY_INTERVALS.get(g.get("priority", "medium"), 60)
         scheduler.add_job(
             run_group,
             "interval",
-            minutes=interval,
+            minutes=settings.scrape_interval_minutes,
             args=[g, criteria],
             id=g["id"],
             next_run_time=datetime.now(tz=timezone.utc),

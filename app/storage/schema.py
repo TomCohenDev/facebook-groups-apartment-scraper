@@ -8,7 +8,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Date,
-    Float,
+    ForeignKey,
     Integer,
     Numeric,
     String,
@@ -39,7 +39,7 @@ class FacebookPost(Base):
     __tablename__ = "facebook_posts"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    group_id: Mapped[str | None] = mapped_column(ForeignKey("facebook_groups.id"), nullable=True)
     post_url: Mapped[str | None] = mapped_column(Text)
     external_post_id: Mapped[str | None] = mapped_column(String(64))
     author_name: Mapped[str | None] = mapped_column(Text)
@@ -54,12 +54,9 @@ class FacebookPost(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     html_snapshot_path: Mapped[str | None] = mapped_column(Text)
     screenshot_path: Mapped[str | None] = mapped_column(Text)
+    alert_sent_at: Mapped[datetime | None] = mapped_column()
 
-    group: Mapped["FacebookGroup"] = relationship(
-        back_populates="posts",
-        primaryjoin="FacebookPost.group_id == FacebookGroup.id",
-        foreign_keys="FacebookPost.group_id",
-    )
+    group: Mapped["FacebookGroup"] = relationship(back_populates="posts")
     images: Mapped[list["FacebookPostImage"]] = relationship(back_populates="post", cascade="all, delete-orphan")
     comments: Mapped[list["FacebookPostComment"]] = relationship(back_populates="post", cascade="all, delete-orphan")
     candidate: Mapped["ApartmentCandidate | None"] = relationship(back_populates="post", cascade="all, delete-orphan")
@@ -69,25 +66,21 @@ class FacebookPostImage(Base):
     __tablename__ = "facebook_post_images"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    post_id: Mapped[int | None] = mapped_column(BigInteger)
+    post_id: Mapped[int | None] = mapped_column(ForeignKey("facebook_posts.id", ondelete="CASCADE"), nullable=True)
     image_url: Mapped[str | None] = mapped_column(Text)
     local_path: Mapped[str | None] = mapped_column(Text)
     alt_text: Mapped[str | None] = mapped_column(Text)
     perceptual_hash: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
-    post: Mapped["FacebookPost"] = relationship(
-        back_populates="images",
-        primaryjoin="FacebookPostImage.post_id == FacebookPost.id",
-        foreign_keys="FacebookPostImage.post_id",
-    )
+    post: Mapped["FacebookPost"] = relationship(back_populates="images")
 
 
 class FacebookPostComment(Base):
     __tablename__ = "facebook_post_comments"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    post_id: Mapped[int | None] = mapped_column(BigInteger)
+    post_id: Mapped[int | None] = mapped_column(ForeignKey("facebook_posts.id", ondelete="CASCADE"), nullable=True)
     author_name: Mapped[str | None] = mapped_column(Text)
     author_profile_url: Mapped[str | None] = mapped_column(Text)
     raw_text: Mapped[str | None] = mapped_column(Text)
@@ -97,18 +90,14 @@ class FacebookPostComment(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     scraped_at: Mapped[datetime] = mapped_column(default=func.now())
 
-    post: Mapped["FacebookPost"] = relationship(
-        back_populates="comments",
-        primaryjoin="FacebookPostComment.post_id == FacebookPost.id",
-        foreign_keys="FacebookPostComment.post_id",
-    )
+    post: Mapped["FacebookPost"] = relationship(back_populates="comments")
 
 
 class ApartmentCandidate(Base):
     __tablename__ = "apartment_candidates"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    post_id: Mapped[int | None] = mapped_column(BigInteger)
+    post_id: Mapped[int | None] = mapped_column(ForeignKey("facebook_posts.id", ondelete="CASCADE"), nullable=True)
     is_listing: Mapped[bool] = mapped_column(Boolean, nullable=False)
     city: Mapped[str | None] = mapped_column(Text)
     neighborhood: Mapped[str | None] = mapped_column(Text)
@@ -132,11 +121,7 @@ class ApartmentCandidate(Base):
     alert_sent_at: Mapped[datetime | None] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
-    post: Mapped["FacebookPost"] = relationship(
-        back_populates="candidate",
-        primaryjoin="ApartmentCandidate.post_id == FacebookPost.id",
-        foreign_keys="ApartmentCandidate.post_id",
-    )
+    post: Mapped["FacebookPost"] = relationship(back_populates="candidate")
 
 
 def create_tables(engine) -> None:

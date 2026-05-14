@@ -2,8 +2,8 @@
 Debug a single group visibly and dump results to runtime/debug/.
 
 Usage:
-    python scripts/debug_group.py --group-id tel_aviv_no_broker
-    python scripts/debug_group.py --group-id tel_aviv_no_broker --headless false
+    python scripts/debug_group.py --group-id hod_hasharon_rentals
+    python scripts/debug_group.py --group-id hod_hasharon_rentals --headless false
 """
 from __future__ import annotations
 

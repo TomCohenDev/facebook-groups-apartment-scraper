@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.settings import settings
 
 _connect_args: dict = {}
-if "supabase.co" in settings.database_url or "sslmode" not in settings.database_url:
-    if "supabase.co" in settings.database_url:
-        _connect_args = {"sslmode": "require"}
+if "supabase.co" in settings.database_url:
+    _connect_args = {"sslmode": "require"}
 
 engine = create_engine(
     settings.database_url,

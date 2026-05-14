@@ -1,0 +1,22 @@
+Metadata-Version: 2.4
+Name: facebook-group-scraper
+Version: 0.1.0
+Requires-Python: >=3.11
+Requires-Dist: playwright>=1.44
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pydantic-settings>=2.0
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: psycopg[binary]>=3.1
+Requires-Dist: apscheduler>=3.10
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: beautifulsoup4>=4.12
+Requires-Dist: rapidfuzz>=3.6
+Requires-Dist: httpx>=0.27
+Requires-Dist: python-telegram-bot>=21.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: pillow>=10.0
+Requires-Dist: imagehash>=4.3
+Requires-Dist: rich>=13.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23; extra == "dev"

@@ -14,10 +14,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/fb_scraper"
     fb_profile_dir: str = "./runtime/fb-profile"
     headless: bool = False
-    scrape_interval_minutes: int = 30
+    scrape_interval_minutes: int = 240
+    max_posts_per_group: int = 20
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     log_level: str = "INFO"
+    openai_api_key: str = ""
+    ai_model: str = "gpt-5.4-nano"
 
     @field_validator("fb_profile_dir")
     @classmethod

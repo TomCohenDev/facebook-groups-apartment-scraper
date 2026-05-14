@@ -63,10 +63,10 @@ Scrapes all enabled groups once, stores results in Postgres, and sends Telegram 
 ## Debug extraction failure
 
 ```bash
-python scripts/debug_group.py --group-id tel_aviv_no_broker
+python scripts/debug_group.py --group-id hod_hasharon_rentals
 ```
 
-Outputs to `runtime/debug/tel_aviv_no_broker/`:
+Outputs to `runtime/debug/hod_hasharon_rentals/`:
 - `screenshot.png` — page state
 - `page.html` — raw HTML
 - `posts.json` — extracted posts summary

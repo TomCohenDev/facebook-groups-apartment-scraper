@@ -1,40 +1,35 @@
+# ── AI model ──────────────────────────────────────────────────────────────────
+ai:
+  model: gpt-5.4-nano
+  send_non_listings: false     # if true, send every post even if AI says it's not a listing
+
+# ── Location ──────────────────────────────────────────────────────────────────
 locations:
   preferred:
-    - "תל אביב"
-    - "גבעתיים"
-    - "רמת גן"
-  neighborhoods:
-    preferred:
-      - "פלורנטין"
-      - "לב העיר"
-      - "הצפון הישן"
-      - "בורוכוב"
+    - "הוד השרון"
+    - "כפר סבא"
+    - "רעננה"
+    - "נווה ירק"
+    - "נווה נאמן"
+    - "גני עם"
+    - "נווה הדר"
+    - 'כפר מל"ל'
+    - "נווה ימין"
+    - "גני חיים"
+    - "גיבעת חן"
 
+# ── Price ─────────────────────────────────────────────────────────────────────
 price:
-  max: 6500
-  ideal_max: 5800
+  max: 4500          # posts above this are still forwarded but flagged
 
+# ── Rooms ─────────────────────────────────────────────────────────────────────
 rooms:
-  min: 2
-  ideal_min: 2.5
+  min: 1             # posts below this are still forwarded but flagged
 
-exclude_keywords:
-  - "מחפש"
-  - "מחפשת"
-  - "דרוש"
-  - "דרושה"
-  - "שותף"
-  - "שותפה"
-  - "סאבלט קצר"
-  - "מכירה"
-
-positive_keywords:
-  - "להשכרה"
-  - "פינוי"
-  - "כניסה"
-  - "ללא תיווך"
-  - "מרפסת"
-  - "חניה"
-  - "ממד"
-  - "ממ\"ד"
-  - "מזגן"
+# ── Property requirements (null = don't filter on this) ───────────────────────
+require:
+  balcony: null
+  parking: null
+  mamad: null
+  pets: null
+  furnished: null

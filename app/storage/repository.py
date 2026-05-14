@@ -6,10 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.facebook.models import RawPost
 from app.storage.schema import (
-    ApartmentCandidate,
     FacebookGroup,
     FacebookPost,
-    FacebookPostComment,
     FacebookPostImage,
 )
 from app.utils.logging import get_logger
@@ -18,28 +16,38 @@ logger = get_logger(__name__)
 
 
 def upsert_group(session: Session, group_cfg: dict) -> FacebookGroup:
-    existing = session.get(FacebookGroup, group_cfg["id"])
+    # Match by URL first — survives ID renames in groups.yaml
+    existing = (
+        session.query(FacebookGroup)
+        .filter(FacebookGroup.url == group_cfg["url"])
+        .first()
+    )
+    if not existing:
+        existing = session.get(FacebookGroup, group_cfg["id"])
     if existing:
         existing.name = group_cfg["name"]
         existing.url = group_cfg["url"]
         existing.enabled = group_cfg.get("enabled", True)
-        existing.priority = group_cfg.get("priority", "medium")
         return existing
     group = FacebookGroup(
         id=group_cfg["id"],
         name=group_cfg["name"],
         url=group_cfg["url"],
         enabled=group_cfg.get("enabled", True),
-        priority=group_cfg.get("priority", "medium"),
     )
     session.add(group)
     return group
 
 
 def get_seen_hashes(session: Session, group_id: str) -> set[str]:
+    """Return content hashes of posts that have already been alerted.
+    Posts saved but not alerted (e.g. send failed) can be retried."""
     rows = (
         session.query(FacebookPost.content_hash)
-        .filter(FacebookPost.group_id == group_id)
+        .filter(
+            FacebookPost.group_id == group_id,
+            FacebookPost.alert_sent_at.isnot(None),
+        )
         .all()
     )
     return {r[0] for r in rows}
@@ -83,77 +91,10 @@ def save_post(session: Session, raw: RawPost) -> FacebookPost | None:
             )
         )
 
-    for cmt in raw.comments:
-        existing_cmt = (
-            session.query(FacebookPostComment)
-            .filter(FacebookPostComment.content_hash == cmt.content_hash)
-            .first()
-        )
-        if not existing_cmt:
-            session.add(
-                FacebookPostComment(
-                    post_id=post.id,
-                    author_name=cmt.author_name,
-                    author_profile_url=cmt.author_profile_url,
-                    raw_text=cmt.raw_text,
-                    normalized_text=cmt.raw_text,
-                    timestamp_text=cmt.timestamp_text,
-                    comment_url=cmt.comment_url,
-                    content_hash=cmt.content_hash,
-                )
-            )
-
     return post
 
 
-def save_candidate(
-    session: Session,
-    post_id: int,
-    extraction,
-    score: int,
-    reasons: list[str],
-) -> ApartmentCandidate:
-    candidate = ApartmentCandidate(
-        post_id=post_id,
-        is_listing=extraction.is_listing,
-        city=extraction.city,
-        neighborhood=extraction.neighborhood,
-        street=extraction.street,
-        price_ils=extraction.price_ils,
-        rooms=float(extraction.rooms) if extraction.rooms else None,
-        sqm=extraction.sqm,
-        floor=extraction.floor,
-        entry_date=extraction.entry_date,
-        brokerage=extraction.brokerage,
-        pets_allowed=extraction.pets_allowed,
-        furnished=extraction.furnished,
-        has_balcony=extraction.has_balcony,
-        has_parking=extraction.has_parking,
-        has_mamad=extraction.has_mamad,
-        phone_numbers=extraction.phone_numbers or [],
-        score=score,
-        reasons=reasons,
-        extraction_json=extraction.model_dump(mode="json"),
-        status="new",
-    )
-    session.add(candidate)
-    session.flush()
-    return candidate
-
-
-def get_unsent_candidates(session: Session, min_score: int) -> list[ApartmentCandidate]:
-    return (
-        session.query(ApartmentCandidate)
-        .filter(
-            ApartmentCandidate.score >= min_score,
-            ApartmentCandidate.alert_sent_at.is_(None),
-            ApartmentCandidate.status == "new",
-        )
-        .all()
-    )
-
-
-def mark_alert_sent(session: Session, candidate_id: int) -> None:
-    candidate = session.get(ApartmentCandidate, candidate_id)
-    if candidate:
-        candidate.alert_sent_at = datetime.now(tz=timezone.utc)
+def mark_post_alerted(session: Session, post_id: int) -> None:
+    post = session.get(FacebookPost, post_id)
+    if post:
+        post.alert_sent_at = datetime.now(tz=timezone.utc)
