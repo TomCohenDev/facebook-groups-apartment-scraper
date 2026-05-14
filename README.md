@@ -153,3 +153,17 @@ apartment relevance classifier (Hebrew rules)
   ↓
 Telegram notifier
 ```
+  screen -S scraper
+  uv run python app/main.py
+
+  Press Ctrl+A then D to detach. The process keeps running in the background, and
+  you can safely close the SSH window. The VM and everything else on it is
+  untouched.
+
+  To come back later:
+  screen -r scraper        # reattach to see logs
+  screen -ls               # list all running screens
+
+  To stop it when needed:
+  screen -r scraper        # reattach first
+  # then Ctrl+C

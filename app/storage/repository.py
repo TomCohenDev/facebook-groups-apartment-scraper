@@ -61,6 +61,8 @@ def save_post(session: Session, raw: RawPost) -> FacebookPost | None:
     )
     if existing:
         existing.last_seen_at = datetime.now(tz=timezone.utc)
+        if existing.alert_sent_at is None:
+            return existing  # unsent — allow retry
         return None
 
     post = FacebookPost(
