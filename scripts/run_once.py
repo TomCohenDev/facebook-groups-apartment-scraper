@@ -32,7 +32,6 @@ logger = get_logger(__name__)
 
 
 def _passes_hard_filters(ai_result: dict | None, criteria: dict) -> bool:
-    """Return False only when we're certain the post fails a hard criterion."""
     if not ai_result:
         return True
     price = ai_result.get("price_ils")
