@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -100,3 +100,17 @@ def mark_post_alerted(session: Session, post_id: int) -> None:
     post = session.get(FacebookPost, post_id)
     if post:
         post.alert_sent_at = datetime.now(tz=timezone.utc)
+
+
+def get_unsent_posts(session: Session, before: datetime) -> list[tuple[FacebookPost, str]]:
+    """Return (post, group_name) pairs scraped before this run but never alerted."""
+    rows = (
+        session.query(FacebookPost, FacebookGroup.name)
+        .join(FacebookGroup, FacebookPost.group_id == FacebookGroup.id)
+        .filter(
+            FacebookPost.alert_sent_at.is_(None),
+            FacebookPost.scraped_at < before,
+        )
+        .all()
+    )
+    return [(post, group_name) for post, group_name in rows]

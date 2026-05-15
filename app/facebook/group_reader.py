@@ -25,7 +25,7 @@ async def read_group(
     group_id = group_cfg["id"]
     group_url = group_cfg["url"]
     max_posts = settings.max_posts_per_group
-    max_scrolls = group_cfg.get("max_scrolls", 30)
+    max_scrolls = group_cfg.get("max_scrolls", settings.max_scrolls)
     scrape_images = group_cfg.get("scrape_images", True)
 
     report = RunReport(
@@ -46,7 +46,10 @@ async def read_group(
             report.errors.append("Failed to navigate to group URL")
             return report
 
-        await asyncio.sleep(3)
+        try:
+            await page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            await asyncio.sleep(1.5)
         logger.debug("Page title: %s | URL: %s", await page.title(), page.url)
         logger.debug("Stories captured from initial load: %d", len(raw_stories))
 

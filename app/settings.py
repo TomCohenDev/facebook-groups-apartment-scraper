@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     openai_api_key: str = ""
     ai_model: str = "gpt-5.4-nano"
+    max_concurrent_groups: int = 5
+    max_scrolls: int = 15
 
     @field_validator("fb_profile_dir")
     @classmethod

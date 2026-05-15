@@ -203,8 +203,8 @@ async def extract_posts_from_page(
     processed_idx = 0
     for i in range(max_scrolls):
         before = len(raw_stories)
-        await scroll_down(page, times=1, delay_ms=2000)
-        await asyncio.sleep(1.5)
+        await scroll_down(page, times=1, delay_ms=800)
+        await asyncio.sleep(0.5)
 
         after = len(raw_stories)
         logger.debug("Scroll %d — stories so far: %d", i + 1, after)
